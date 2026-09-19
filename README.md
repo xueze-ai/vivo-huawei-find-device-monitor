@@ -25,6 +25,11 @@
 - 保存 sessionStorage 与 Cookie，容器重启后尝试恢复会话。
 - 登录失效与页面读取失败使用不同标题通知。
 
+### 运行结果
+<img width="1080" height="2376" alt="54d8d5324c0e5ae924be250bde0c0a26" src="https://github.com/user-attachments/assets/ce18dca1-1738-4b09-bcd0-062b7986f378" />
+<img width="1080" height="2376" alt="84ec5016b77cd9a72f830e41d27df310" src="https://github.com/user-attachments/assets/a02b28bb-4a68-4be6-b7da-c09362924ae7" />
+<img width="1080" height="2376" alt="8896623000869a0641ceab30d3be3783" src="https://github.com/user-attachments/assets/2ee3495d-cb85-4335-97fb-37c7f157054d" />
+
 ## 工作方式
 
 ```mermaid
