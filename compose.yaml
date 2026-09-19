@@ -1,0 +1,32 @@
+services:
+  vivo-monitor:
+    build: .
+    init: true
+    restart: unless-stopped
+    shm_size: 512mb
+    env_file: .env
+    environment:
+      APP_DIR: /app/vivo
+      CONFIG: /app/vivo/config.json
+      DATA_DIR: /data
+    command: ["monitor"]
+    ports:
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - ./data/vivo:/data
+      - ./vivo/config.json:/app/vivo/config.json:ro
+
+  huawei-monitor:
+    build: .
+    init: true
+    restart: unless-stopped
+    shm_size: 512mb
+    env_file: .env
+    environment:
+      APP_DIR: /app/huawei
+      DATA_DIR: /data
+    command: ["monitor"]
+    ports:
+      - "127.0.0.1:6081:6080"
+    volumes:
+      - ./data/huawei:/data

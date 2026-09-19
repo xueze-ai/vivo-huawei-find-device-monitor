@@ -1,0 +1,27 @@
+{
+  "adapter_verified": false,
+  "url": "https://find.vivo.com.cn/",
+  "interval_seconds": 300,
+  "report_interval_seconds": 1800,
+  "max_age_seconds": 360,
+  "movement_meters": 100,
+  "crs": "BD09",
+  "device_id": "share:REPLACE_ME",
+  "share_member_name": "请替换为共享联系人名称",
+  "notification_prefix": "家人A",
+  "unknown_accuracy_buffer_meters": 150,
+  "zones": [
+    {
+      "name": "示例区域",
+      "lat": 31.2304,
+      "lon": 121.4737,
+      "radius_meters": 500,
+      "buffer_meters": 50
+    }
+  ],
+  "adapter": {
+    "click_selectors": [],
+    "ready_selector": ".share-detail",
+    "extract_script": "/app/vivo/extract.js"
+  }
+}
