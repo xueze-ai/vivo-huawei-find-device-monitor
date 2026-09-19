@@ -70,7 +70,7 @@ flowchart LR
 ### 1. 准备配置
 
 ```bash
-git clone https://github.com/OWNER/vivo-huawei-find-device-monitor.git
+git clone https://github.com/xueze-ai/vivo-huawei-find-device-monitor.git
 cd vivo-huawei-find-device-monitor
 cp .env.example .env
 cp vivo/config.example.json vivo/config.json
