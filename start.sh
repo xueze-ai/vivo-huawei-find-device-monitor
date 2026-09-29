@@ -19,6 +19,8 @@ done
 x11vnc -display :99 -localhost -forever -shared -nopw -rfbport 5900 >/dev/null 2>&1 &
 websockify --web=/usr/share/novnc/ 6080 localhost:5900 >/dev/null 2>&1 &
 app_dir="${APP_DIR:-/app/vivo}"
+data_dir="${DATA_DIR:-/data}"
+rm -f "$data_dir/browser/SingletonLock" "$data_dir/browser/SingletonCookie" "$data_dir/browser/SingletonSocket"
 if [ "${1:-monitor}" = login ]; then
   python "$app_dir/login.py" &
 else

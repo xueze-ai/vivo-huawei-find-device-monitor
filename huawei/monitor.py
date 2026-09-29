@@ -18,7 +18,7 @@ PERSON_LABEL = os.environ.get('HUAWEI_NOTIFICATION_LABEL', '家人').strip()
 CONTACTS_LABEL = os.environ.get('HUAWEI_CONTACTS_LABEL', 'Contacts').strip()
 SHARING_TEXT = os.environ.get('HUAWEI_SHARING_TEXT', 'Sharing the location of 1 devices').strip()
 KEEPALIVE_SECONDS = int(os.environ.get('HUAWEI_KEEPALIVE_SECONDS', '600'))
-LOGIN_MARKERS = ('LOG IN', '扫码登录', '密码登录', '登录华为账号', 'HUAWEI Mobile Cloud')
+LOGIN_MARKERS = ('LOG IN', '扫码登录', '密码登录', '登录华为账号')
 
 
 def parse_schedules(value):
@@ -29,7 +29,7 @@ def parse_schedules(value):
     return result
 
 
-SCHEDULES = parse_schedules(os.environ.get('HUAWEI_REPORT_TIMES', '09:30,21:00'))
+SCHEDULES = parse_schedules(os.environ.get('HUAWEI_REPORT_TIMES', '09:10,22:10'))
 
 
 def send(title, body):
@@ -44,10 +44,19 @@ def send(title, body):
 
 
 async def open_find_phone(page, refresh=False):
-    if 'webFindPhone' in page.url and refresh:
-        await page.reload(wait_until='domcontentloaded', timeout=60000)
-    elif 'webFindPhone' not in page.url:
-        await page.goto(URL, wait_until='domcontentloaded', timeout=60000)
+    for attempt in range(2):
+        try:
+            if 'webFindPhone' in page.url and refresh:
+                await page.reload(wait_until='domcontentloaded', timeout=60000)
+            elif 'webFindPhone' not in page.url:
+                await page.goto(URL, wait_until='domcontentloaded', timeout=60000)
+            break
+        except Exception as exc:
+            transient = 'ERR_ABORTED' in str(exc) or 'frame was detached' in str(exc)
+            if attempt == 0 and transient:
+                await page.wait_for_timeout(3000)
+                continue
+            raise
     await page.wait_for_timeout(3000)
     text = (await page.locator('body').inner_text(timeout=10000))[:5000]
     if 'webFindPhone' not in page.url or any(marker in text for marker in LOGIN_MARKERS):
@@ -199,9 +208,7 @@ async def main():
                 except PermissionError:
                     if not login_alerted:
                         stamp = now.isoformat(timespec='seconds')
-                        alert_title = f'{PERSON_LABEL}·华为登录失效'
-                        await asyncio.to_thread(send, alert_title, f'检查时间：{stamp}\n\n服务器上的华为账号需要重新登录验证。')
-                        print(stamp + ' ' + alert_title, flush=True)
+                        print(stamp + ' 华为登录已失效，等待定时汇报', flush=True)
                         (DATA / 'login-alerted').write_text(stamp, encoding='utf-8')
                         login_alerted = True
                 except Exception as exc:

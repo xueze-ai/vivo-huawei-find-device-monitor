@@ -10,8 +10,8 @@
 
 - 默认每 5 分钟刷新一次定位。
 - 判断未移动、移动距离、手机离线或定位未更新。
-- 支持多个圆形电子围栏，到达或离开时通知。
-- 默认每 30 分钟主动汇报一次当前位置。
+- 支持多个圆形电子围栏，并在定时汇报中说明当前区域状态。
+- vivo 默认每天 09:00、22:00 汇报；华为默认每天 09:10、22:10 汇报。
 - 通知标题格式：`称呼·地址·状态`。
 - 登录失效、连续定位异常时通知。
 - SQLite 保存最后有效位置和待发送通知，发送失败自动退避重试。
@@ -89,7 +89,7 @@ chmod -R 700 data
 SERVERCHAN_SENDKEY=SCT_REPLACE_WITH_YOUR_SENDKEY
 HUAWEI_DEVICE_NAME=你的设备显示名称
 HUAWEI_NOTIFICATION_LABEL=家人B
-HUAWEI_REPORT_TIMES=09:30,21:00
+HUAWEI_REPORT_TIMES=09:10,22:10
 ```
 
 编辑 `vivo/config.json`：

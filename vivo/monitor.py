@@ -7,7 +7,7 @@ import sqlite3
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import AsyncExitStack
 from core import distance, evaluate
 
@@ -106,8 +106,33 @@ async def read_fix(page, cfg, previous_timestamp=0):
         await asyncio.sleep(3)
 
 
-def report_due(state, cfg, now):
-    return now - float(state.get('last_report_at', 0)) >= cfg.get('report_interval_seconds', 1800)
+def parse_schedules(values):
+    schedules = []
+    for value in values or ('09:00', '22:00'):
+        hour, minute = str(value).split(':', 1)
+        schedules.append((int(hour), int(minute)))
+    return tuple(schedules)
+
+
+def due_report_slot(state, cfg, now):
+    """Return one unsent daily slot during its short delivery window."""
+    schedules = parse_schedules(cfg.get('report_times'))
+    grace = int(cfg.get('report_grace_seconds', 15 * 60))
+    sent = set(state.get('sent_report_slots', []))
+    for hour, minute in schedules:
+        scheduled = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        age = (now - scheduled).total_seconds()
+        slot = scheduled.strftime('%Y-%m-%d-%H:%M')
+        if 0 <= age < grace and slot not in sent:
+            return slot
+    return None
+
+
+def mark_report_slot(state, slot, now):
+    cutoff = (now.date() - timedelta(days=1)).isoformat()
+    slots = {item for item in state.get('sent_report_slots', []) if item >= cutoff}
+    slots.add(slot)
+    state['sent_report_slots'] = sorted(slots)
 
 
 def motion_title(anchor, fix, threshold):
@@ -134,15 +159,6 @@ def queue(db, title, body):
     with db:
         db.execute('INSERT INTO outbox(title,body,created) VALUES (?,?,?)', (title, body, time.time()))
     print(stamp + ' ' + title, flush=True)
-
-
-def notification_title(cfg, state, status):
-    prefix = str(cfg.get('notification_prefix', '')).strip()
-    if not prefix:
-        return status
-    fix = state.get('fix') or {}
-    address = str(fix.get('address') or '地址未知').strip()
-    return f'{prefix}·{address}·{status}'
 
 
 async def main():
@@ -174,10 +190,11 @@ async def main():
             while True:
                 started = time.monotonic()
                 now = time.time()
+                local_now = datetime.now().astimezone()
                 row = db.execute('SELECT value FROM state WHERE id=1').fetchone()
                 state = json.loads(row[0]) if row else {}
                 previous_status = state.get('source_status')
-                due = report_due(state, cfg, now)
+                report_slot = due_report_slot(state, cfg, local_now)
                 title = body = None
                 try:
                     if context is None:
@@ -190,15 +207,14 @@ async def main():
 
                     if eval_title == '手机离线或定位未更新':
                         state['source_status'] = 'stale'
-                        if previous_status != 'stale' or due:
+                        if report_slot:
                             title = '手机离线或定位未更新'
                             body = add_last_fix(detail, state)
-                            state['last_report_at'] = now
                     else:
                         state['source_status'] = 'ok'
                         event = eval_title if eval_title != '定位更新' else None
                         recovered = previous_status in ('stale', 'login', 'error')
-                        if event or due or recovered:
+                        if report_slot:
                             report_title, meters = motion_title(
                                 old_state.get('report_fix') or old_state.get('fix'),
                                 fix,
@@ -212,16 +228,13 @@ async def main():
                             parts.append(report_title)
                             title = '；'.join(parts)
                             body = add_last_fix(detail, state)
-                            if due or recovered:
-                                state['last_report_at'] = now
-                                state['report_fix'] = fix
+                            state['report_fix'] = fix
                 except LoginRequired:
                     failures = 0
                     state['source_status'] = 'login'
-                    if previous_status != 'login' or due:
+                    if report_slot:
                         title = 'vivo 登录失效'
                         body = add_last_fix('服务器上的 vivo 登录状态已失效，需要重新登录验证。', state)
-                        state['last_report_at'] = now
                     if context:
                         try:
                             await context.close()
@@ -231,10 +244,9 @@ async def main():
                 except Exception as exc:
                     failures += 1
                     state['source_status'] = 'error'
-                    if previous_status != 'error' or due:
+                    if report_slot:
                         title = '定位监控异常'
                         body = add_last_fix('页面没有正常完成定位检查。可能是网络故障、页面结构变化或浏览器异常。', state)
-                        state['last_report_at'] = now
                     print(type(exc).__name__ + ': ' + str(exc)[:200], flush=True)
                     if context:
                         try:
@@ -245,7 +257,11 @@ async def main():
                 with db:
                     db.execute('INSERT OR REPLACE INTO state VALUES (1,?)', (json.dumps(state, ensure_ascii=False),))
                 if title:
-                    queue(db, notification_title(cfg, state, title), body)
+                    prefix = str(cfg.get('notification_prefix', '')).strip()
+                    queue(db, (prefix + '·' if prefix else '') + title, body)
+                    mark_report_slot(state, report_slot, local_now)
+                    with db:
+                        db.execute('INSERT OR REPLACE INTO state VALUES (1,?)', (json.dumps(state, ensure_ascii=False),))
                 (DATA / 'heartbeat').write_text(str(time.time()))
                 if sender.done():
                     raise RuntimeError('通知工作进程停止，需要重启')
