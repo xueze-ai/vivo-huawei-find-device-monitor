@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'vivo'))
-from monitor import due_report_slot, mark_report_slot
+from monitor import due_report_slot, location_title, mark_report_slot
 
 
 class ScheduleTests(unittest.TestCase):
@@ -16,6 +16,10 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(slot, '2026-09-29-09:00')
         mark_report_slot(state, slot, now)
         self.assertIsNone(due_report_slot(state, config, now))
+
+    def test_location_title_prefers_address(self):
+        fix = {'address': '某市某学校', 'lat': 30.0, 'lon': 110.0}
+        self.assertEqual(location_title(fix), '某市某学校')
 
     def test_outside_delivery_window_is_not_due(self):
         config = {'report_times': ['09:00', '22:00'], 'report_grace_seconds': 900}

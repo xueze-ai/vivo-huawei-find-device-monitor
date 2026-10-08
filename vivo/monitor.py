@@ -144,6 +144,13 @@ def motion_title(anchor, fix, threshold):
     return f'移动约 {meters:.0f} 米', meters
 
 
+def location_title(fix):
+    address = str(fix.get('address') or '').strip()
+    if address:
+        return address
+    return f"{fix['lat']:.6f}, {fix['lon']:.6f}"
+
+
 def add_last_fix(body, state):
     fix = state.get('fix')
     if not fix:
@@ -220,14 +227,13 @@ async def main():
                                 fix,
                                 cfg['movement_meters'],
                             )
-                            parts = []
+                            parts = [detail, '移动情况：' + report_title]
                             if event:
-                                parts.append(event)
+                                parts.append('围栏变化：' + event)
                             if recovered:
-                                parts.append('定位已恢复')
-                            parts.append(report_title)
-                            title = '；'.join(parts)
-                            body = add_last_fix(detail, state)
+                                parts.append('状态：定位已恢复')
+                            title = location_title(fix)
+                            body = add_last_fix('\n\n'.join(parts), state)
                             state['report_fix'] = fix
                 except LoginRequired:
                     failures = 0
