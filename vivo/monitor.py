@@ -12,6 +12,7 @@ from contextlib import AsyncExitStack
 from core import distance, evaluate
 
 DATA = Path(os.environ.get('DATA_DIR', '/data'))
+MAX_DAILY_NOTIFICATIONS = int(os.environ.get('MAX_DAILY_NOTIFICATIONS', '2'))
 
 
 class LoginRequired(Exception):
@@ -47,7 +48,9 @@ async def notifications(db):
             db.execute('DELETE FROM outbox WHERE created<?', (now - 86400,))
             db.execute('DELETE FROM quota WHERE day<?', (day,))
         quota = db.execute('SELECT used FROM quota WHERE day=?', (day,)).fetchone()
-        if quota and quota[0] >= 900:
+        if quota and quota[0] >= MAX_DAILY_NOTIFICATIONS:
+            with db:
+                db.execute('DELETE FROM outbox')
             await asyncio.sleep(60)
             continue
         row = db.execute('SELECT id,title,body,attempts,created FROM outbox WHERE next_at<=? ORDER BY id LIMIT 1', (time.time(),)).fetchone()
@@ -55,16 +58,13 @@ async def notifications(db):
             ident, title, body, attempts, created = row
             with db:
                 db.execute('INSERT INTO quota(day,used) VALUES (?,1) ON CONFLICT(day) DO UPDATE SET used=used+1', (day,))
+                # Remove before the network call: delivery is intentionally at-most-once.
+                db.execute('DELETE FROM outbox WHERE id=?', (ident,))
             try:
                 await asyncio.to_thread(send, title, body)
             except Exception:
                 # Never log exceptions containing a credential-bearing request URL.
-                with db:
-                    db.execute('UPDATE outbox SET attempts=attempts+1,next_at=? WHERE id=?', (time.time() + min(3600, 60 * 2**min(attempts, 6)), ident))
-                print('通知发送失败，已安排重试', flush=True)
-            else:
-                with db:
-                    db.execute('DELETE FROM outbox WHERE id=?', (ident,))
+                print('通知发送失败，本次不重试', flush=True)
         await asyncio.sleep(5)
 
 
